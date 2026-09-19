@@ -17,7 +17,7 @@ L'app distingue due ruoli:
 - catalogo aggiornato dei modelli OpenRouter;
 - modalità locale senza API;
 - copia negli appunti ed esportazione in un file di testo;
-- chiave API mantenuta soltanto in memoria durante l'esecuzione.
+- chiave API conservabile nel Portachiavi protetto di macOS oppure soltanto in memoria.
 
 ## Requisiti
 
@@ -27,7 +27,7 @@ L'app distingue due ruoli:
 
 ## Installazione
 
-1. Scarica `Prompt-Studio-1.1.1-macOS.zip` dalla sezione **Releases**.
+1. Scarica `Prompt-Studio-1.1.2-macOS.zip` dalla sezione **Releases**.
 2. Estrai l'archivio.
 3. Sposta `Prompt Studio.app` nella cartella Applicazioni.
 4. Apri l'app, entra in **Impostazioni** e inserisci la chiave OpenRouter.
@@ -37,7 +37,7 @@ La build distribuita è firmata localmente, ma non è notarizzata da Apple. Al p
 
 ## Privacy e costi
 
-La chiave OpenRouter non viene salvata su disco. Quando si preme **Genera prompt**, richiesta, contesto e istruzioni vengono inviati a OpenRouter e al fornitore del modello scelto. Il costo dipende dal modello e dalle tariffe dell'account OpenRouter. Il solo identificativo del modello selezionato viene ricordato fra gli avvii.
+Se l'opzione dedicata è attiva, la chiave OpenRouter viene conservata nel Portachiavi protetto di macOS e recuperata ai successivi avvii. È possibile rimuoverla dalle impostazioni oppure scegliere di mantenerla soltanto nella memoria della sessione. Quando si preme **Genera prompt**, richiesta, contesto e istruzioni vengono inviati a OpenRouter e al fornitore del modello scelto. Il costo dipende dal modello e dalle tariffe dell'account OpenRouter. Il solo identificativo del modello selezionato viene ricordato fra gli avvii.
 
 Leggi [PRIVACY.md](PRIVACY.md) per i dettagli.
 
@@ -66,4 +66,3 @@ Non inserire mai una chiave API nel codice, nelle segnalazioni di problemi o nel
 ## Licenza
 
 Il codice è distribuito con licenza [MIT](LICENSE).
-

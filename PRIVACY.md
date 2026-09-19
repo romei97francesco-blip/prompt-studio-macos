@@ -4,7 +4,9 @@ Prompt Studio non richiede un account proprio e non gestisce un server dell'appl
 
 ## Dati conservati sul Mac
 
-- La chiave API OpenRouter resta soltanto nella memoria dell'app e viene persa alla chiusura.
+- Se l'utente attiva il salvataggio, la chiave API OpenRouter viene custodita nel Portachiavi protetto di macOS e recuperata ai successivi avvii.
+- Se il salvataggio è disattivato, la chiave resta soltanto nella memoria dell'app e viene persa alla chiusura.
+- La chiave salvata può essere rimossa in qualsiasi momento dalle impostazioni dell'app.
 - L'identificativo del modello generatore selezionato viene salvato nelle preferenze locali di macOS.
 - Richieste e prompt generati non vengono salvati automaticamente. Vengono scritti su disco soltanto quando l'utente sceglie **Esporta**.
 
@@ -24,4 +26,3 @@ Il caricamento del catalogo usa l'endpoint pubblico dei modelli OpenRouter e non
 ## Modalità locale
 
 Disattivando **Generazione tramite OpenRouter**, il prompt viene composto sul Mac senza inviare dati a servizi esterni.
-

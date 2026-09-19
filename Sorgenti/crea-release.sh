@@ -2,7 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-version="1.1.1"
+version="1.1.2"
 mkdir -p dist
 ./Sorgenti/test.sh
 ./Sorgenti/compila.sh

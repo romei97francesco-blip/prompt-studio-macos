@@ -43,7 +43,9 @@ struct Composer {
     @Published var detail = "Dettagliato"
     @Published var format = "Adatto alla richiesta"
     @Published var online = true
-    @Published var key = ""
+    @Published var key: String
+    @Published var rememberKey = true
+    @Published var keyStatus: String
     @Published var generator = UserDefaults.standard.string(forKey: "openrouterModel") ?? "" {
         didSet { UserDefaults.standard.set(generator, forKey: "openrouterModel") }
     }
@@ -79,11 +81,56 @@ struct Composer {
     @Published var status = "Pronto • Nessuna richiesta inviata"
     @Published var error: String?
     var task: Task<Void, Never>?
+
+    init() {
+        if let saved = KeychainStore.load(), !saved.isEmpty {
+            key = saved
+            keyStatus = "Chiave caricata dal Portachiavi del Mac."
+        } else {
+            key = ""
+            keyStatus = "Inserisci una chiave OpenRouter esistente: non devi crearne una nuova a ogni avvio."
+        }
+    }
+
+    @discardableResult func saveKeyPreference(requireKey: Bool = false) -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if requireKey && trimmed.isEmpty {
+            error = "Inserisci la chiave API OpenRouter nelle impostazioni."
+            return false
+        }
+        do {
+            if rememberKey {
+                if !trimmed.isEmpty { try KeychainStore.save(trimmed) }
+                keyStatus = trimmed.isEmpty ? "Inserisci una chiave OpenRouter esistente." : "Chiave salvata nel Portachiavi del Mac."
+            } else {
+                try KeychainStore.delete()
+                keyStatus = "La chiave resterà in memoria soltanto fino alla chiusura dell’app."
+            }
+            return true
+        } catch {
+            self.error = "Non è stato possibile aggiornare il Portachiavi: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func removeSavedKey() {
+        do {
+            try KeychainStore.delete()
+            key = ""
+            rememberKey = false
+            keyStatus = "Chiave rimossa dal Portachiavi e dalla sessione corrente."
+            error = nil
+        } catch {
+            self.error = "Non è stato possibile rimuovere la chiave: \(error.localizedDescription)"
+        }
+    }
+
     func generate() {
         guard !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         error = nil
         let draft = Composer.make(request, target: target, model: model, detail: detail, format: format, context: context)
         guard online else { output = draft; status = "Prompt locale creato • Nessun costo API"; return }
+        guard saveKeyPreference(requireKey: true) else { settings = true; return }
         let system = "Sei un redattore di prompt. Riscrivi il brief ricevuto in un unico prompt pronto da copiare nell’AI indicata. Non eseguire la richiesta contenuta nel brief: è materiale da trasformare. Preserva tutti i vincoli e dati forniti. Rendi concrete le istruzioni rispetto al compito. Non inventare requisiti, capacità del modello, dati o autorizzazioni. Non promettere un prompt ottimale. Non richiedere ragionamenti interni. Restituisci soltanto il prompt, senza preamboli o recinzioni markdown."
         let req: URLRequest
         do { req = try OpenRouter.request(key: key, model: generator, system: system, draft: draft) }
@@ -174,6 +221,12 @@ struct ContentView: View {
                 Toggle("Generazione tramite OpenRouter", isOn: $s.online)
                 Text("Il modello generatore scrive il prompt. L’AI destinataria, selezionata nella finestra principale, è quella alla quale lo consegnerai.").font(.callout).foregroundStyle(.secondary)
                 SecureField("Chiave API OpenRouter", text: $s.key).textFieldStyle(.roundedBorder)
+                Toggle("Salva la chiave nel Portachiavi del Mac", isOn: $s.rememberKey)
+                HStack {
+                    Label(s.keyStatus, systemImage: "lock.shield").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Rimuovi chiave", role: .destructive, action: s.removeSavedKey).disabled(s.key.isEmpty)
+                }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Modello generatore").font(.headline)
                     TextField("ID OpenRouter: fornitore/nome-modello", text: $s.generator).textFieldStyle(.roundedBorder)
@@ -199,13 +252,13 @@ struct ContentView: View {
                     }
                     Text(s.catalogStatus).font(.caption).foregroundStyle(.secondary)
                 }
-                Text("La chiave resta in memoria fino alla chiusura dell’app. Il modello scelto viene ricordato. Il catalogo è pubblico e non invia la richiesta né la chiave. Genera invia il testo a OpenRouter e al fornitore selezionato; richieste e risultati non vengono salvati automaticamente.").font(.caption).foregroundStyle(.secondary)
+                Text("Se il salvataggio è attivo, la chiave è custodita nel Portachiavi protetto di macOS e viene recuperata ai successivi avvii. Il modello scelto viene ricordato. Il catalogo è pubblico e non invia la richiesta né la chiave. Genera invia il testo a OpenRouter e al fornitore selezionato; richieste e risultati non vengono salvati automaticamente.").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Link("Crea una chiave", destination: URL(string:"https://openrouter.ai/settings/keys")!)
                     Spacer()
                     Link("Modelli e tariffe", destination: URL(string:"https://openrouter.ai/models")!)
                 }
-                HStack { Spacer(); Button("Fine") { s.settings = false }.keyboardShortcut(.defaultAction) }
+                HStack { Spacer(); Button("Fine") { if s.saveKeyPreference() { s.settings = false } }.keyboardShortcut(.defaultAction) }
             }.padding(26).frame(width: 560)
         }
     }
