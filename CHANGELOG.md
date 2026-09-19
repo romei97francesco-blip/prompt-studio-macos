@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.3 - 2026-09-19
+
+- corretta la generazione con DeepSeek V4.1 Flash e altri modelli di ragionamento;
+- il budget di output viene ora riservato al prompt finale;
+- aggiunto il supporto alle risposte testuali multipart di OpenRouter;
+- migliorati i messaggi per risposte vuote, troncate o terminate dal fornitore.
+
 ## 1.1.2 - 2026-09-19
 
 - la chiave OpenRouter può essere salvata e recuperata dal Portachiavi protetto di macOS;

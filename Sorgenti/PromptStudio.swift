@@ -83,12 +83,19 @@ struct Composer {
     var task: Task<Void, Never>?
 
     init() {
-        if let saved = KeychainStore.load(), !saved.isEmpty {
-            key = saved
-            keyStatus = "Chiave caricata dal Portachiavi del Mac."
-        } else {
-            key = ""
-            keyStatus = "Inserisci una chiave OpenRouter esistente: non devi crearne una nuova a ogni avvio."
+        key = ""
+        keyStatus = "Caricamento della chiave dal Portachiavi del Mac…"
+        Task.detached(priority: .userInitiated) {
+            let saved = KeychainStore.load()
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if let saved, !saved.isEmpty {
+                    self.key = saved
+                    self.keyStatus = "Chiave caricata dal Portachiavi del Mac."
+                } else {
+                    self.keyStatus = "Inserisci una chiave OpenRouter esistente: non devi crearne una nuova a ogni avvio."
+                }
+            }
         }
     }
 

@@ -22,8 +22,28 @@ enum OpenRouter {
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Prompt Studio", forHTTPHeaderField: "X-Title")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "messages": [["role":"system", "content":system], ["role":"user", "content":draft]], "max_tokens": 3500, "stream": false])
+        req.httpBody = try JSONSerialization.data(withJSONObject: [
+            "model": model,
+            "messages": [["role":"system", "content":system], ["role":"user", "content":draft]],
+            "max_completion_tokens": 3500,
+            "reasoning_effort": "none",
+            "modalities": ["text"],
+            "stream": false
+        ])
         return req
+    }
+    private static func text(from content: Any?) -> String? {
+        if let content = content as? String {
+            let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : content
+        }
+        guard let parts = content as? [[String:Any]] else { return nil }
+        let combined = parts.compactMap { part -> String? in
+            if let text = part["text"] as? String { return text }
+            if let text = part["content"] as? String { return text }
+            return nil
+        }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return combined.isEmpty ? nil : combined
     }
     static func parse(_ data: Data, status: Int) throws -> RouterResult {
         guard status == 200 else {
@@ -32,9 +52,16 @@ enum OpenRouter {
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String:Any] else { throw failure("Risposta OpenRouter non valida.") }
         guard json["error"] == nil else { throw failure("OpenRouter ha segnalato un errore di generazione. Verifica modello, credito e disponibilità del fornitore.") }
-        guard let choices = json["choices"] as? [[String:Any]], let first = choices.first, let message = first["message"] as? [String:Any], let content = message["content"] as? String, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw failure("Il modello non ha restituito testo utilizzabile. Prova un altro modello o ripeti la richiesta.") }
-        if first["finish_reason"] as? String == "error" { throw failure("La generazione è terminata con un errore del fornitore.") }
-        return RouterResult(text: content, truncated: first["finish_reason"] as? String == "length", tokens: (json["usage"] as? [String:Any])?["total_tokens"] as? Int)
+        guard let choices = json["choices"] as? [[String:Any]], let first = choices.first, let message = first["message"] as? [String:Any] else { throw failure("La risposta di OpenRouter non contiene un risultato utilizzabile.") }
+        let finishReason = first["finish_reason"] as? String
+        if finishReason == "error" { throw failure("La generazione è terminata con un errore del fornitore. Riprova o cambia modello.") }
+        guard let content = text(from: message["content"]) else {
+            if finishReason == "length" {
+                throw failure("Il modello ha esaurito il limite di output prima di scrivere il prompt. Riduci la richiesta o riprova.")
+            }
+            throw failure("Il modello non ha restituito testo. Riprova; se il problema continua, cambia modello generatore.")
+        }
+        return RouterResult(text: content, truncated: finishReason == "length", tokens: (json["usage"] as? [String:Any])?["total_tokens"] as? Int)
     }
     static func catalog(_ data: Data) throws -> [RouterModel] {
         struct Response: Decodable { let data: [RouterModel] }

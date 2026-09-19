@@ -1,4 +1,4 @@
-PROMPT STUDIO — versione 1.1.2, OpenRouter
+PROMPT STUDIO — versione 1.1.3, OpenRouter
 
 1. Apri Prompt Studio.app e premi Impostazioni.
 2. Inserisci la tua chiave API OpenRouter (https://openrouter.ai/settings/keys).
@@ -18,7 +18,7 @@ Richieste e risultati non vengono salvati automaticamente. Esporta i prompt da c
 
 VERIFICHE
 Compilazione nativa e firma locale verificate. Icona dedicata inclusa per Finder e Dock; se l’app è già aperta, il Dock potrebbe aggiornarsi al successivo avvio.
-Test isolati senza rete superati: costruzione richiesta, controllo chiave/modello, parsing risultato, risposta troncata, errori HTTP, errori nella risposta, filtro catalogo e persistenza nel Portachiavi.
+Test isolati senza rete superati: costruzione richiesta in modalità testuale senza ragionamento, controllo chiave/modello, parsing di risposte semplici e multipart, risposta troncata, errori HTTP, errori nella risposta, filtro catalogo e persistenza nel Portachiavi.
 Interfaccia OpenRouter verificata nell’app. Caricamento del catalogo non confermato in questa sessione; disponibile anche inserimento manuale dell’ID.
 Generazione con account OpenRouter reale non verificata: nessuna chiave fornita e nessun consumo API effettuato.
 

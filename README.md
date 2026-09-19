@@ -17,7 +17,8 @@ L'app distingue due ruoli:
 - catalogo aggiornato dei modelli OpenRouter;
 - modalità locale senza API;
 - copia negli appunti ed esportazione in un file di testo;
-- chiave API conservabile nel Portachiavi protetto di macOS oppure soltanto in memoria.
+- chiave API conservabile nel Portachiavi protetto di macOS oppure soltanto in memoria;
+- richieste OpenRouter in modalità testuale, senza consumare il limite di output nel ragionamento interno del modello.
 
 ## Requisiti
 
@@ -27,7 +28,7 @@ L'app distingue due ruoli:
 
 ## Installazione
 
-1. Scarica `Prompt-Studio-1.1.2-macOS.zip` dalla sezione **Releases**.
+1. Scarica `Prompt-Studio-1.1.3-macOS.zip` dalla sezione **Releases**.
 2. Estrai l'archivio.
 3. Sposta `Prompt Studio.app` nella cartella Applicazioni.
 4. Apri l'app, entra in **Impostazioni** e inserisci la chiave OpenRouter.
@@ -57,7 +58,7 @@ Lo script crea o aggiorna `Prompt Studio.app` nella radice del progetto e applic
 ./Sorgenti/test.sh
 ```
 
-I test non effettuano chiamate di rete e verificano la costruzione delle richieste, la validazione di chiave e modello, le risposte normali e troncate, gli errori HTTP e il filtro del catalogo.
+I test non effettuano chiamate di rete e verificano la costruzione delle richieste, la modalità testuale senza ragionamento, la validazione di chiave e modello, le risposte testuali semplici e multipart, le risposte troncate, gli errori HTTP e il filtro del catalogo.
 
 ## Sicurezza
 
