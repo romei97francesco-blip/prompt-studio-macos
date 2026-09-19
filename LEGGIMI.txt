@@ -1,0 +1,26 @@
+PROMPT STUDIO — versione 1.1.1, OpenRouter
+
+1. Apri Prompt Studio.app e premi Impostazioni.
+2. Inserisci la tua chiave API OpenRouter (https://openrouter.ai/settings/keys).
+3. Premi Carica catalogo, cerca un modello e clicca sul suo nome. In alternativa incolla il suo ID OpenRouter nel campo Modello generatore.
+4. Premi Fine. Seleziona l’AI destinataria nella finestra principale e indica eventualmente la versione del modello destinatario.
+5. Scrivi la richiesta nel riquadro sinistro, aggiungi eventuali vincoli e premi Genera prompt (Cmd + Invio).
+6. Modifica, copia o esporta il risultato dal riquadro destro.
+
+Il modello generatore su OpenRouter scrive il prompt. L’AI destinataria è quella alla quale consegnerai il prompt: possono essere diverse.
+Il catalogo viene caricato dal servizio pubblico https://openrouter.ai/api/v1/models, senza chiave né testo della richiesta. Puoi cercare per nome o fornitore; vengono mostrati fino a 40 risultati per ricerca, con output testuale.
+La chiave resta in memoria fino alla chiusura dell’app; non viene salvata su disco. Il solo ID del modello generatore viene ricordato fra gli avvii.
+In modalità API, premere Genera invia richiesta, contesto e istruzioni a OpenRouter e al fornitore del modello selezionato. Si applicano le tariffe del tuo account per quel modello. Il risultato non viene inviato automaticamente all’AI destinataria.
+Nessun invio viene ripetuto automaticamente. Annullare una richiesta già inviata non garantisce l’annullamento dell’addebito lato fornitore.
+La modalità locale facoltativa compone una struttura guidata senza chiamare un modello.
+Non esiste una garanzia del «prompt migliore»: verifica i risultati sul tuo caso d’uso.
+Richieste e risultati non vengono salvati automaticamente. Esporta i prompt da conservare.
+
+VERIFICHE
+Compilazione nativa e firma locale verificate. Icona dedicata inclusa per Finder e Dock; se l’app è già aperta, il Dock potrebbe aggiornarsi al successivo avvio.
+Test isolati senza rete superati: costruzione richiesta, controllo chiave/modello, parsing risultato, risposta troncata, errori HTTP, errori nella risposta, filtro catalogo.
+Interfaccia OpenRouter verificata nell’app. Caricamento del catalogo non confermato in questa sessione; disponibile anche inserimento manuale dell’ID.
+Generazione con account OpenRouter reale non verificata: nessuna chiave fornita e nessun consumo API effettuato.
+
+Sorgenti inclusi nella cartella Sorgenti.
+Documentazione API: https://openrouter.ai/docs/quickstart
