@@ -18,7 +18,9 @@ L'app distingue due ruoli:
 - modalità locale senza API;
 - copia negli appunti ed esportazione in un file di testo;
 - chiave API conservabile nel Portachiavi protetto di macOS oppure soltanto in memoria;
-- richieste OpenRouter in modalità testuale, senza consumare il limite di output nel ragionamento interno del modello.
+- richieste OpenRouter in modalità testuale, senza consumare il limite di output nel ragionamento interno del modello;
+- il prompt compare mentre viene scritto (streaming) e i guasti temporanei di rete vengono ritentati automaticamente;
+- il catalogo dei modelli viene conservato su disco e riproposto all'avvio.
 
 ## Requisiti
 
@@ -58,7 +60,7 @@ Lo script crea o aggiorna `Prompt Studio.app` nella radice del progetto e applic
 ./Sorgenti/test.sh
 ```
 
-I test non effettuano chiamate di rete e verificano la costruzione delle richieste, la modalità testuale senza ragionamento, la validazione di chiave e modello, le risposte testuali semplici e multipart, le risposte troncate, gli errori HTTP e il filtro del catalogo.
+I test non effettuano chiamate di rete e verificano la costruzione delle richieste (anche in streaming), la modalità testuale senza ragionamento, la validazione di chiave e modello, le risposte testuali semplici e multipart, le risposte troncate, gli errori HTTP, il filtro del catalogo, l'analisi degli eventi SSE, la classificazione degli errori ritentabili, l'attesa crescente, i messaggi di rete e la cache su disco del catalogo.
 
 ## Sicurezza
 

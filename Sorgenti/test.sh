@@ -11,3 +11,7 @@ swiftc -module-cache-path "$cache_dir" OpenRouter.swift Test/RouterTests.swift -
 keychain_binary="${TMPDIR:-/private/tmp}/PromptStudioKeychainTests"
 swiftc -module-cache-path "$cache_dir" KeychainStore.swift Test/KeychainTests.swift -o "$keychain_binary" -framework Security
 "$keychain_binary"
+
+composer_binary="${TMPDIR:-/private/tmp}/PromptStudioComposerTests"
+swiftc -module-cache-path "$cache_dir" Composer.swift Test/ComposerTests.swift -o "$composer_binary"
+"$composer_binary"

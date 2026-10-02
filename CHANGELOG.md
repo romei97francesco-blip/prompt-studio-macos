@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0 - 2026-09-20
+
+- il prompt compare mentre viene scritto: la generazione usa lo streaming di OpenRouter invece di attendere la risposta completa;
+- i guasti temporanei (limite di richieste, fornitore non disponibile, rete instabile) vengono ritentati automaticamente fino a tre volte con attesa crescente;
+- i messaggi di errore di rete distinguono assenza di connessione, timeout e DNS non raggiungibile;
+- il catalogo dei modelli viene salvato su disco e riproposto all'avvio, senza attese;
+- la chiave viene riscritta nel Portachiavi solo quando cambia davvero;
+- la versione della release è letta da `Info.plist`, unica fonte di verità;
+- il pulsante di generazione diventa «Rigenera» quando esiste già un risultato, e «Svuota» azzera richiesta, contesto e risultato;
+- scorciatoie da tastiera: ⌘S per esportare e ⌘⇧C per copiare il prompt;
+- il modello generatore attivo è mostrato nell'intestazione ed è cliccabile per cambiarlo;
+- la composizione locale del prompt è isolata in `Composer`, con test dedicati e correzione del ritaglio di modello e contesto.
+
 ## 1.1.3 - 2026-09-19
 
 - corretta la generazione con DeepSeek V4.1 Flash e altri modelli di ragionamento;
