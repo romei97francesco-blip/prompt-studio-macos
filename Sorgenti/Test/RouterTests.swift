@@ -45,7 +45,8 @@ import Foundation
         // Riepilogo di consumo: token e stima di costo, con fallback quando i prezzi mancano.
         precondition(OpenRouter.usageSummary(nil, model: models[0]) == nil)
         precondition(OpenRouter.usageSummary(Usage(prompt: 1000, completion: 500, total: 1500), model: models[0]) == "1500 token (1000 in + 500 out) • stima ~$0,00045")
-        precondition(OpenRouter.usageSummary(Usage(prompt: 10, completion: 5, total: 15), model: nil) == "15 token (10 in + 5 out) • costo non stimabile")
+        precondition(OpenRouter.usageSummary(Usage(prompt: 10, completion: 5, total: 15), model: nil) == "15 token (10 in + 5 out) • costo non stimabile: carica il catalogo per la stima")
+        precondition(OpenRouter.usageSummary(Usage(prompt: 10, completion: 5, total: 15), model: unpriced) == "15 token (10 in + 5 out) • costo non stimabile: il modello non espone prezzi")
         precondition(OpenRouter.usageSummary(Usage(prompt: nil, completion: nil, total: 42), model: models[0]) == "42 token • costo non stimabile")
 
         // Limite di token di output: default documentato e valore personalizzato.
@@ -152,6 +153,13 @@ import Foundation
         let cached = OpenRouter.loadCachedCatalog(from: cacheFile)
         precondition(cached?.count == 1 && cached?[0].id == "v/text")
         precondition(OpenRouter.loadCachedCatalog(from: cacheFile, maxAge: -1) == nil)
+
+        // Risoluzione del modello per la stima: prima in memoria, poi dalla cache
+        // su disco anche scaduta, altrimenti nessun risultato.
+        precondition(OpenRouter.model(id: "v/text", in: models)?.id == "v/text")
+        precondition(OpenRouter.model(id: "v/text", in: [], cacheFile: cacheFile)?.id == "v/text")
+        precondition(OpenRouter.model(id: "v/text", in: [unpriced], cacheFile: cacheFile)?.id == "v/text")
+        precondition(OpenRouter.model(id: "assente/modello", in: [], cacheFile: cacheFile) == nil)
 
         // Età del catalogo salvato: data disponibile e descrizione leggibile.
         precondition(OpenRouter.cachedCatalogDate(from: cacheFile) != nil)

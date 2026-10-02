@@ -149,7 +149,7 @@ import AppKit
                     let result = try await stream(req: req, session: session)
                     try Task.checkCancellation()
                     output = result.text
-                    usageSummary = OpenRouter.usageSummary(result.usage, model: models.first { $0.id == selectedGenerator })
+                    usageSummary = OpenRouter.usageSummary(result.usage, model: OpenRouter.model(id: selectedGenerator, in: models))
                     status = result.truncated ? "Attenzione: risultato troncato dal limite di output" : "\(selectedGenerator) → \(destination)"
                     return
                 } catch {

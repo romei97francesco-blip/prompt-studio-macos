@@ -207,7 +207,7 @@ enum OpenRouter {
     // MARK: - Riepilogo di consumo
 
     /// Riepilogo leggibile dei token consumati e del costo stimato.
-    /// `model` è il modello generatore, se presente nel catalogo con i prezzi.
+    /// `model` è il modello generatore risolto con `model(id:in:)`.
     /// Restituisce `nil` se non ci sono token da mostrare.
     static func usageSummary(_ usage: Usage?, model: RouterModel?) -> String? {
         guard let usage else { return nil }
@@ -221,9 +221,14 @@ enum OpenRouter {
         } else {
             tokens = "\(total) token"
         }
-        guard let prompt, let completion,
-              let cost = model?.estimatedCost(promptTokens: prompt, completionTokens: completion) else {
+        guard let prompt, let completion else {
             return "\(tokens) • costo non stimabile"
+        }
+        guard let model else {
+            return "\(tokens) • costo non stimabile: carica il catalogo per la stima"
+        }
+        guard let cost = model.estimatedCost(promptTokens: prompt, completionTokens: completion) else {
+            return "\(tokens) • costo non stimabile: il modello non espone prezzi"
         }
         return "\(tokens) • stima ~\(formattedCost(cost))"
     }
@@ -260,6 +265,15 @@ enum OpenRouter {
               Date().timeIntervalSince(modified) < maxAge,
               let data = try? Data(contentsOf: file) else { return nil }
         return try? catalog(data)
+    }
+
+    /// Risolve il modello generatore per la stima di costo: prima dal catalogo in
+    /// memoria, poi dalla cache su disco anche se scaduta. I prezzi cambiano di
+    /// rado e servono solo per una stima, quindi una cache vecchia è preferibile a
+    /// nessuna stima. Restituisce `nil` se il modello non è disponibile altrove.
+    static func model(id: String, in models: [RouterModel], cacheFile: URL? = nil) -> RouterModel? {
+        if let found = models.first(where: { $0.id == id }) { return found }
+        return loadCachedCatalog(from: cacheFile, maxAge: .infinity)?.first { $0.id == id }
     }
 
     static func saveCachedCatalog(_ data: Data, to file: URL? = nil) {
