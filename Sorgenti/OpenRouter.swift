@@ -5,9 +5,17 @@ struct RouterModel: Decodable, Identifiable {
     let name: String
     let architecture: Architecture?
     let pricing: Pricing?
+    let reasoning: Reasoning?
     struct Architecture: Decodable { let output_modalities: [String]? }
     /// Prezzi OpenRouter in USD per singolo token, come stringhe decimali.
     struct Pricing: Decodable { let prompt: String?; let completion: String? }
+    /// Capacità di ragionamento dichiarate dal catalogo OpenRouter.
+    struct Reasoning: Decodable { let mandatory: Bool? }
+
+    /// Vero se il modello accetta che il ragionamento venga disattivato.
+    /// I modelli con ragionamento obbligatorio (es. Claude Opus 5.5) rifiutano
+    /// la disattivazione con HTTP 400, quindi non va richiesta.
+    var allowsDisablingReasoning: Bool { reasoning != nil && reasoning?.mandatory != true }
 
     /// Costo stimato in USD per una generazione, dai prezzi del catalogo.
     /// Restituisce `nil` se il modello non espone entrambi i prezzi.
@@ -57,7 +65,11 @@ enum OpenRouter {
         OpenRouterError(message: text, retryable: retryable)
     }
 
-    static func request(key: String, model: String, system: String, draft: String, stream: Bool = false, maxOutputTokens: Int = OpenRouter.defaultMaxOutputTokens) throws -> URLRequest {
+    /// Costruisce la richiesta di generazione.
+    /// `disableReasoning` aggiunge `reasoning: { enabled: false }` per evitare i token di
+    /// ragionamento. Va attivato solo per i modelli che lo consentono: quelli con
+    /// ragionamento obbligatorio (es. Claude Opus 5.5) rifiutano la disattivazione con HTTP 400.
+    static func request(key: String, model: String, system: String, draft: String, stream: Bool = false, maxOutputTokens: Int = OpenRouter.defaultMaxOutputTokens, disableReasoning: Bool = true) throws -> URLRequest {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { throw failure("Inserisci la chiave API OpenRouter nelle impostazioni.") }
@@ -72,10 +84,10 @@ enum OpenRouter {
             "model": model,
             "messages": [["role": "system", "content": system], ["role": "user", "content": draft]],
             "max_completion_tokens": maxOutputTokens,
-            "reasoning_effort": "none",
             "modalities": ["text"],
             "stream": stream
         ]
+        if disableReasoning { body["reasoning"] = ["enabled": false] }
         if stream { body["stream_options"] = ["include_usage": true] }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         return req
@@ -106,7 +118,21 @@ enum OpenRouter {
         return combined.isEmpty ? nil : combined
     }
 
-    static func httpFailure(_ status: Int) -> OpenRouterError {
+    /// Messaggio di dettaglio restituito da OpenRouter nel corpo di una risposta di errore.
+    /// È già pensato per essere leggibile (es. "… is not a valid model ID"), quindi
+    /// aiuta a capire la causa senza esporre JSON grezzo. Limitato per non invadere la UI.
+    static func errorDetail(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = json["error"] as? [String: Any],
+              let message = error["message"] as? String else { return nil }
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.count > 240 ? String(trimmed.prefix(240)) + "…" : trimmed
+    }
+
+    /// Errore HTTP con messaggio comprensibile. Se `detail` è presente, il motivo
+    /// specifico restituito da OpenRouter viene accodato al messaggio generico.
+    static func httpFailure(_ status: Int, detail: String? = nil) -> OpenRouterError {
         let messages: [Int: String] = [
             400: "Richiesta non accettata. Verifica il modello selezionato.",
             401: "Chiave OpenRouter non valida o revocata.",
@@ -117,11 +143,13 @@ enum OpenRouter {
             502: "Il fornitore del modello non è disponibile. Riprova più tardi.",
             503: "Nessun fornitore disponibile per il modello selezionato."
         ]
-        return failure(messages[status] ?? "OpenRouter ha restituito un errore HTTP \(status).", retryable: isRetryable(status: status))
+        let base = messages[status] ?? "OpenRouter ha restituito un errore HTTP \(status)."
+        let message = detail.map { "\(base) Dettaglio: \($0)" } ?? base
+        return failure(message, retryable: isRetryable(status: status))
     }
 
     static func parse(_ data: Data, status: Int) throws -> RouterResult {
-        guard status == 200 else { throw httpFailure(status) }
+        guard status == 200 else { throw httpFailure(status, detail: errorDetail(from: data)) }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw failure("Risposta OpenRouter non valida.") }
         guard json["error"] == nil else { throw failure("OpenRouter ha segnalato un errore di generazione. Verifica modello, credito e disponibilità del fornitore.") }
         guard let choices = json["choices"] as? [[String: Any]], let first = choices.first, let message = first["message"] as? [String: Any] else { throw failure("La risposta di OpenRouter non contiene un risultato utilizzabile.") }

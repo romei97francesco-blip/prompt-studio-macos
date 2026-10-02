@@ -8,7 +8,8 @@ import Foundation
         precondition(body["model"] as? String == "vendor/model")
         precondition(body["max_completion_tokens"] as? Int == 3500)
         precondition(body["max_tokens"] == nil)
-        precondition(body["reasoning_effort"] as? String == "none")
+        precondition(body["reasoning"] as? [String: Bool] == ["enabled": false])
+        precondition(body["reasoning_effort"] == nil)
         precondition(body["modalities"] as? [String] == ["text"])
         precondition(body["stream"] as? Bool == false)
         precondition(body["stream_options"] == nil)
@@ -39,7 +40,7 @@ import Foundation
         // Stima di costo: prezzi in USD per singolo token (1000*0.00000015 + 500*0.0000006).
         let cost = models[0].estimatedCost(promptTokens: 1000, completionTokens: 500)
         precondition(cost != nil && abs(cost! - 0.00045) < 1e-12)
-        let unpriced = RouterModel(id: "x", name: "X", architecture: nil, pricing: nil)
+        let unpriced = RouterModel(id: "x", name: "X", architecture: nil, pricing: nil, reasoning: nil)
         precondition(unpriced.estimatedCost(promptTokens: 10, completionTokens: 10) == nil)
 
         // Riepilogo di consumo: token e stima di costo, con fallback quando i prezzi mancano.
@@ -48,6 +49,31 @@ import Foundation
         precondition(OpenRouter.usageSummary(Usage(prompt: 10, completion: 5, total: 15), model: nil) == "15 token (10 in + 5 out) • costo non stimabile: carica il catalogo per la stima")
         precondition(OpenRouter.usageSummary(Usage(prompt: 10, completion: 5, total: 15), model: unpriced) == "15 token (10 in + 5 out) • costo non stimabile: il modello non espone prezzi")
         precondition(OpenRouter.usageSummary(Usage(prompt: nil, completion: nil, total: 42), model: models[0]) == "42 token • costo non stimabile")
+
+        // Disattivazione del ragionamento: attiva per impostazione predefinita, omessa su richiesta.
+        let noReasoningRequest = try OpenRouter.request(key: "k", model: "m", system: "s", draft: "d", disableReasoning: false)
+        let noReasoningBody = try JSONSerialization.jsonObject(with: noReasoningRequest.httpBody!) as! [String:Any]
+        precondition(noReasoningBody["reasoning"] == nil)
+        precondition(noReasoningBody["reasoning_effort"] == nil)
+
+        // Il catalogo decide se il ragionamento può essere disattivato: i modelli con
+        // ragionamento obbligatorio (es. Claude Opus 5.5) rifiuterebbero la richiesta.
+        let mandatory = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: true))
+        precondition(!mandatory.allowsDisablingReasoning)
+        let optional = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: false))
+        precondition(optional.allowsDisablingReasoning)
+        let noReasoningModel = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: nil)
+        precondition(!noReasoningModel.allowsDisablingReasoning)
+
+        // Il dettaglio di errore restituito da OpenRouter non va perso.
+        let errorBody = Data(#"{"error":{"message":"reasoning_effort: none is not supported","code":400}}"#.utf8)
+        precondition(OpenRouter.errorDetail(from: errorBody) == "reasoning_effort: none is not supported")
+        precondition(OpenRouter.errorDetail(from: Data(#"{"choices":[]}"#.utf8)) == nil)
+        precondition(OpenRouter.httpFailure(400).message == "Richiesta non accettata. Verifica il modello selezionato.")
+        precondition(OpenRouter.httpFailure(400, detail: "boom").message.contains("boom"))
+        do { _ = try OpenRouter.parse(errorBody, status: 400); fatalError("HTTP error ignored") } catch {
+            precondition((error as? OpenRouterError)?.message.contains("reasoning_effort") == true)
+        }
 
         // Limite di token di output: default documentato e valore personalizzato.
         precondition(OpenRouter.defaultMaxOutputTokens == 3500)
@@ -174,6 +200,6 @@ import Foundation
         precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-2 * 86400), now: now) == "2 giorni fa")
         precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(60), now: now) == "poco fa")
 
-        print("PASS: request, no-reasoning text mode, credential/model validation, string and multipart responses, truncation, 8 HTTP errors, malformed content, model filtering, pricing and cost estimate, usage summary, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
+        print("PASS: request, no-reasoning text mode (conditional on model), credential/model validation, string and multipart responses, truncation, 8 HTTP errors with detail, malformed content, model filtering, pricing and cost estimate, usage summary, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
     }
 }
