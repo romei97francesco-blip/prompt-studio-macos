@@ -18,11 +18,17 @@ struct OpenRouterError: LocalizedError {
 enum OpenRouter {
     static let endpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
 
+    /// Limite di token di output inviato a OpenRouter.
+    /// 3500 è un compromesso prudente: lascia spazio a prompt lunghi e strutturati
+    /// senza esporre a costi imprevisti sui modelli a consumo. È configurabile
+    /// tramite il parametro `maxOutputTokens` di `request`.
+    static let defaultMaxOutputTokens = 3500
+
     static func failure(_ text: String, retryable: Bool = false) -> OpenRouterError {
         OpenRouterError(message: text, retryable: retryable)
     }
 
-    static func request(key: String, model: String, system: String, draft: String, stream: Bool = false) throws -> URLRequest {
+    static func request(key: String, model: String, system: String, draft: String, stream: Bool = false, maxOutputTokens: Int = OpenRouter.defaultMaxOutputTokens) throws -> URLRequest {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { throw failure("Inserisci la chiave API OpenRouter nelle impostazioni.") }
@@ -36,7 +42,7 @@ enum OpenRouter {
         var body: [String: Any] = [
             "model": model,
             "messages": [["role": "system", "content": system], ["role": "user", "content": draft]],
-            "max_completion_tokens": 3500,
+            "max_completion_tokens": maxOutputTokens,
             "reasoning_effort": "none",
             "modalities": ["text"],
             "stream": stream

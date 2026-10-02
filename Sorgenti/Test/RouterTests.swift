@@ -34,6 +34,12 @@ import Foundation
         let models = try OpenRouter.catalog(catalog)
         precondition(models.count == 1 && models[0].id == "v/text")
 
+        // Limite di token di output: default documentato e valore personalizzato.
+        precondition(OpenRouter.defaultMaxOutputTokens == 3500)
+        let customRequest = try OpenRouter.request(key: "k", model: "m", system: "s", draft: "d", maxOutputTokens: 8000)
+        let customBody = try JSONSerialization.jsonObject(with: customRequest.httpBody!) as! [String:Any]
+        precondition(customBody["max_completion_tokens"] as? Int == 8000)
+
         // Richiesta in streaming: attiva stream e include_usage.
         let streamRequest = try OpenRouter.request(key: "k", model: "m", system: "s", draft: "d", stream: true)
         let streamBody = try JSONSerialization.jsonObject(with: streamRequest.httpBody!) as! [String:Any]
