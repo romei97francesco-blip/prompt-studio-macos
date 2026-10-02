@@ -196,4 +196,25 @@ enum OpenRouter {
         guard let file = file ?? cacheFile() else { return }
         try? data.write(to: file, options: .atomic)
     }
+
+    /// Data di salvataggio del catalogo in cache, se il file esiste.
+    static func cachedCatalogDate(from file: URL? = nil) -> Date? {
+        guard let file = file ?? cacheFile(),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+              let modified = attributes[.modificationDate] as? Date else { return nil }
+        return modified
+    }
+
+    /// Età del catalogo salvato in forma leggibile (es. "3 ore fa").
+    /// Funzione pura: `now` è iniettabile per rendere il risultato verificabile.
+    static func ageDescription(since date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, now.timeIntervalSince(date))
+        let minutes = Int(seconds / 60)
+        if minutes < 1 { return "poco fa" }
+        if minutes < 60 { return "\(minutes) min fa" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours) \(hours == 1 ? "ora" : "ore") fa" }
+        let days = hours / 24
+        return "\(days) \(days == 1 ? "giorno" : "giorni") fa"
+    }
 }

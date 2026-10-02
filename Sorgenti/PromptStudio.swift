@@ -63,7 +63,9 @@ import AppKit
                 guard let self else { return }
                 if let cached {
                     self.models = cached
-                    self.catalogStatus = "\(cached.count) modelli dal catalogo salvato • aggiorna per verificare le novità."
+                    let age = OpenRouter.cachedCatalogDate().map { OpenRouter.ageDescription(since: $0) }
+                    let when = age.map { "salvato \($0)" } ?? "salvato in precedenza"
+                    self.catalogStatus = "\(cached.count) modelli dal catalogo \(when) • aggiorna per verificare le novità."
                 }
                 if let saved, !saved.isEmpty {
                     self.key = saved

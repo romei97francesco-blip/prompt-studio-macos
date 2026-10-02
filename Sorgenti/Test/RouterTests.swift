@@ -133,6 +133,19 @@ import Foundation
         precondition(cached?.count == 1 && cached?[0].id == "v/text")
         precondition(OpenRouter.loadCachedCatalog(from: cacheFile, maxAge: -1) == nil)
 
+        // Età del catalogo salvato: data disponibile e descrizione leggibile.
+        precondition(OpenRouter.cachedCatalogDate(from: cacheFile) != nil)
+        let missing = tempDir.appendingPathComponent("assente.json")
+        precondition(OpenRouter.cachedCatalogDate(from: missing) == nil)
+        let now = Date()
+        precondition(OpenRouter.ageDescription(since: now, now: now) == "poco fa")
+        precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-90), now: now) == "1 min fa")
+        precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-3600), now: now) == "1 ora fa")
+        precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-3 * 3600), now: now) == "3 ore fa")
+        precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-86400), now: now) == "1 giorno fa")
+        precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-2 * 86400), now: now) == "2 giorni fa")
+        precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(60), now: now) == "poco fa")
+
         print("PASS: request, no-reasoning text mode, credential/model validation, string and multipart responses, truncation, 8 HTTP errors, malformed content, model filtering, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
     }
 }
