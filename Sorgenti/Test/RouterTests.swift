@@ -58,12 +58,25 @@ import Foundation
 
         // Il catalogo decide se il ragionamento può essere disattivato: i modelli con
         // ragionamento obbligatorio (es. Claude Opus 5.5) rifiuterebbero la richiesta.
-        let mandatory = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: true))
+        let mandatory = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: true, supported_efforts: ["high", "medium", "low"]))
         precondition(!mandatory.allowsDisablingReasoning)
-        let optional = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: false))
+        // Sui modelli obbligatori si chiede l'effort più basso disponibile (l'ultimo
+        // dell'elenco, ordinato dal più alto) per non consumare il budget di output.
+        precondition(mandatory.minimalReasoningEffort == "low")
+        let mandatoryNoEfforts = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: true, supported_efforts: nil))
+        precondition(mandatoryNoEfforts.minimalReasoningEffort == nil)
+        let optional = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: RouterModel.Reasoning(mandatory: false, supported_efforts: ["high", "low"]))
         precondition(optional.allowsDisablingReasoning)
         let noReasoningModel = RouterModel(id: "m", name: "M", architecture: nil, pricing: nil, reasoning: nil)
         precondition(!noReasoningModel.allowsDisablingReasoning)
+        precondition(noReasoningModel.minimalReasoningEffort == nil)
+
+        // Un modello obbligatorio accetta `reasoning.effort` ma rifiuta `enabled: false`:
+        // la richiesta deve contenere solo l'effort, mai `reasoning_effort`.
+        let effortRequest = try OpenRouter.request(key: "k", model: "m", system: "s", draft: "d", disableReasoning: false, reasoningEffort: mandatory.minimalReasoningEffort)
+        let effortBody = try JSONSerialization.jsonObject(with: effortRequest.httpBody!) as! [String:Any]
+        precondition(effortBody["reasoning"] as? [String: String] == ["effort": "low"])
+        precondition(effortBody["reasoning_effort"] == nil)
 
         // Il dettaglio di errore restituito da OpenRouter non va perso.
         let errorBody = Data(#"{"error":{"message":"reasoning_effort: none is not supported","code":400}}"#.utf8)
@@ -200,6 +213,6 @@ import Foundation
         precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-2 * 86400), now: now) == "2 giorni fa")
         precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(60), now: now) == "poco fa")
 
-        print("PASS: request, no-reasoning text mode (conditional on model), credential/model validation, string and multipart responses, truncation, 8 HTTP errors with detail, malformed content, model filtering, pricing and cost estimate, usage summary, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
+        print("PASS: request, no-reasoning text mode (conditional on model), reasoning effort for mandatory-reasoning models, credential/model validation, string and multipart responses, truncation, 8 HTTP errors with detail, malformed content, model filtering, pricing and cost estimate, usage summary, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
     }
 }

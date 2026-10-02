@@ -10,12 +10,20 @@ struct RouterModel: Decodable, Identifiable {
     /// Prezzi OpenRouter in USD per singolo token, come stringhe decimali.
     struct Pricing: Decodable { let prompt: String?; let completion: String? }
     /// Capacità di ragionamento dichiarate dal catalogo OpenRouter.
-    struct Reasoning: Decodable { let mandatory: Bool? }
+    /// `supported_efforts` è ordinato dal più alto al più basso.
+    struct Reasoning: Decodable { let mandatory: Bool?; let supported_efforts: [String]? }
 
     /// Vero se il modello accetta che il ragionamento venga disattivato.
     /// I modelli con ragionamento obbligatorio (es. Claude Opus 5.5) rifiutano
     /// la disattivazione con HTTP 400, quindi non va richiesta.
     var allowsDisablingReasoning: Bool { reasoning != nil && reasoning?.mandatory != true }
+
+    /// Effort di ragionamento più basso accettato dal catalogo, se dichiarato.
+    /// Sui modelli con ragionamento obbligatorio è l'unico modo per contenere i
+    /// token di pensiero e lasciare il limite di output al prompt finale: senza
+    /// un effort il modello parte dal proprio valore predefinito e può consumare
+    /// l'intero budget di output ragionando.
+    var minimalReasoningEffort: String? { reasoning?.supported_efforts?.last }
 
     /// Costo stimato in USD per una generazione, dai prezzi del catalogo.
     /// Restituisce `nil` se il modello non espone entrambi i prezzi.
@@ -69,7 +77,9 @@ enum OpenRouter {
     /// `disableReasoning` aggiunge `reasoning: { enabled: false }` per evitare i token di
     /// ragionamento. Va attivato solo per i modelli che lo consentono: quelli con
     /// ragionamento obbligatorio (es. Claude Opus 5.5) rifiutano la disattivazione con HTTP 400.
-    static func request(key: String, model: String, system: String, draft: String, stream: Bool = false, maxOutputTokens: Int = OpenRouter.defaultMaxOutputTokens, disableReasoning: Bool = true) throws -> URLRequest {
+    /// Per questi ultimi si passa invece `reasoningEffort`, il livello più basso accettato
+    /// dal modello, per non bruciare il budget di output nel ragionamento.
+    static func request(key: String, model: String, system: String, draft: String, stream: Bool = false, maxOutputTokens: Int = OpenRouter.defaultMaxOutputTokens, disableReasoning: Bool = true, reasoningEffort: String? = nil) throws -> URLRequest {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { throw failure("Inserisci la chiave API OpenRouter nelle impostazioni.") }
@@ -88,6 +98,7 @@ enum OpenRouter {
             "stream": stream
         ]
         if disableReasoning { body["reasoning"] = ["enabled": false] }
+        else if let reasoningEffort { body["reasoning"] = ["effort": reasoningEffort] }
         if stream { body["stream_options"] = ["include_usage": true] }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         return req

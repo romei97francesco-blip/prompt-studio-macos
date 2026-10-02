@@ -136,8 +136,12 @@ import AppKit
         let selectedGenerator = generator.trimmingCharacters(in: .whitespacesAndNewlines)
         // Disattiva il ragionamento solo se il modello lo consente: quelli con
         // ragionamento obbligatorio (es. Claude Opus 5.5) rifiuterebbero la richiesta.
-        let disableReasoning = OpenRouter.model(id: selectedGenerator, in: models)?.allowsDisablingReasoning ?? false
-        do { req = try OpenRouter.request(key: key, model: generator, system: system, draft: draft, stream: true, maxOutputTokens: maxOutputTokens, disableReasoning: disableReasoning) }
+        // In quel caso si chiede l'effort più basso dichiarato dal catalogo, così i
+        // token di pensiero non consumano il limite di output destinato al prompt.
+        let generatorModel = OpenRouter.model(id: selectedGenerator, in: models)
+        let disableReasoning = generatorModel?.allowsDisablingReasoning ?? false
+        let reasoningEffort = disableReasoning ? nil : generatorModel?.minimalReasoningEffort
+        do { req = try OpenRouter.request(key: key, model: generator, system: system, draft: draft, stream: true, maxOutputTokens: maxOutputTokens, disableReasoning: disableReasoning, reasoningEffort: reasoningEffort) }
         catch { self.error = error.localizedDescription; settings = true; return }
         busy = true
         status = "OpenRouter sta elaborando il prompt…"
@@ -353,15 +357,27 @@ struct ContentView: View {
             }.padding(26).frame(width: 560)
         }
     }
+    /// Inset del testo negli editor. SwiftUI applica `editorPadding` al TextEditor,
+    /// mentre l'NSTextView sottostante aggiunge `editorLineFragmentPadding` orizzontale
+    /// e nessun inset verticale. Il placeholder riusa gli stessi valori per restare
+    /// allineato al cursore e al testo digitato.
+    private var editorPadding: CGFloat { 10 }
+    private var editorLineFragmentPadding: CGFloat { 5 }
+
     func editor(title: String, subtitle: String, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.headline)
             Text(subtitle).font(.caption).foregroundStyle(.secondary)
             ZStack(alignment: .topLeading) {
-                TextEditor(text: text).font(.system(size: 14)).scrollContentBackground(.hidden).padding(10).disabled(s.busy)
+                TextEditor(text: text).font(.system(size: 14)).scrollContentBackground(.hidden).padding(editorPadding).disabled(s.busy)
                     .accessibilityLabel(title)
                     .accessibilityHint(subtitle)
-                if text.wrappedValue.isEmpty { Text(placeholder).font(.system(size: 14)).foregroundStyle(.tertiary).padding(15).allowsHitTesting(false).accessibilityHidden(true) }
+                if text.wrappedValue.isEmpty {
+                    Text(placeholder).font(.system(size: 14)).foregroundStyle(.tertiary)
+                        .padding(editorPadding)
+                        .padding(.leading, editorLineFragmentPadding)
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
             }.background(Color(nsColor: .textBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.10)))
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
