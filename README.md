@@ -30,7 +30,7 @@ L'app distingue due ruoli:
 
 ## Installazione
 
-1. Scarica `Prompt-Studio-1.1.3-macOS.zip` dalla sezione **Releases**.
+1. Scarica `Prompt-Studio-1.2.0-macOS.zip` dalla sezione **Releases**.
 2. Estrai l'archivio.
 3. Sposta `Prompt Studio.app` nella cartella Applicazioni.
 4. Apri l'app, entra in **Impostazioni** e inserisci la chiave OpenRouter.
