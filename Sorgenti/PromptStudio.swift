@@ -236,15 +236,16 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Modello generatore OpenRouter usato per riscrivere il prompt. Fai clic per cambiarlo.")
+                    .accessibilityHint("Apre le impostazioni per cambiare il modello generatore.")
                     .disabled(s.busy)
                 }
                 Button { s.settings = true } label: { Label("Impostazioni", systemImage: "slider.horizontal.3") }.disabled(s.busy)
             }
             HStack(spacing: 14) {
-                VStack(alignment: .leading) { Text("AI DESTINATARIA").font(.caption).foregroundStyle(.secondary); Picker("AI", selection: $s.target) { ForEach(Composer.targets, id: \.self) { Text($0) } }.labelsHidden().frame(width: 170) }
-                VStack(alignment: .leading) { Text("MODELLO (FACOLTATIVO)").font(.caption).foregroundStyle(.secondary); TextField("Es. V4.1 Flash", text: $s.model).textFieldStyle(.roundedBorder).frame(width: 170) }
-                VStack(alignment: .leading) { Text("DETTAGLIO").font(.caption).foregroundStyle(.secondary); Picker("Dettaglio", selection: $s.detail) { ForEach(["Sintetico", "Bilanciato", "Dettagliato"], id: \.self) { Text($0) } }.labelsHidden().frame(width: 145) }
-                VStack(alignment: .leading) { Text("FORMATO").font(.caption).foregroundStyle(.secondary); Picker("Formato", selection: $s.format) { ForEach(["Adatto alla richiesta", "Passaggi operativi", "Tabella", "Codice e verifica", "Documento", "JSON valido"], id: \.self) { Text($0) } }.labelsHidden().frame(width: 180) }
+                VStack(alignment: .leading) { Text("AI DESTINATARIA").font(.caption).foregroundStyle(.secondary); Picker("AI", selection: $s.target) { ForEach(Composer.targets, id: \.self) { Text($0) } }.labelsHidden().frame(width: 170).accessibilityLabel("AI destinataria del prompt") }
+                VStack(alignment: .leading) { Text("MODELLO (FACOLTATIVO)").font(.caption).foregroundStyle(.secondary); TextField("Es. V4.1 Flash", text: $s.model).textFieldStyle(.roundedBorder).frame(width: 170).accessibilityLabel("Modello dell'AI destinataria, facoltativo") }
+                VStack(alignment: .leading) { Text("DETTAGLIO").font(.caption).foregroundStyle(.secondary); Picker("Dettaglio", selection: $s.detail) { ForEach(["Sintetico", "Bilanciato", "Dettagliato"], id: \.self) { Text($0) } }.labelsHidden().frame(width: 145).accessibilityLabel("Livello di dettaglio") }
+                VStack(alignment: .leading) { Text("FORMATO").font(.caption).foregroundStyle(.secondary); Picker("Formato", selection: $s.format) { ForEach(["Adatto alla richiesta", "Passaggi operativi", "Tabella", "Codice e verifica", "Documento", "JSON valido"], id: \.self) { Text($0) } }.labelsHidden().frame(width: 180).accessibilityLabel("Formato del prompt") }
                 Spacer()
             }.disabled(s.busy)
             HStack(spacing: 18) {
@@ -305,6 +306,8 @@ struct ContentView: View {
                                             if s.generator == model.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(.indigo) }
                                         }.padding(7).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                                     }.buttonStyle(.plain)
+                                    .accessibilityLabel("\(model.name), \(model.id)")
+                                    .accessibilityAddTraits(s.generator == model.id ? .isSelected : [])
                                 }
                                 if s.matchingModels.isEmpty { Text("Nessun modello trovato.").foregroundStyle(.secondary) }
                             }
@@ -328,7 +331,9 @@ struct ContentView: View {
             Text(subtitle).font(.caption).foregroundStyle(.secondary)
             ZStack(alignment: .topLeading) {
                 TextEditor(text: text).font(.system(size: 14)).scrollContentBackground(.hidden).padding(10).disabled(s.busy)
-                if text.wrappedValue.isEmpty { Text(placeholder).font(.system(size: 14)).foregroundStyle(.tertiary).padding(15).allowsHitTesting(false) }
+                    .accessibilityLabel(title)
+                    .accessibilityHint(subtitle)
+                if text.wrappedValue.isEmpty { Text(placeholder).font(.system(size: 14)).foregroundStyle(.tertiary).padding(15).allowsHitTesting(false).accessibilityHidden(true) }
             }.background(Color(nsColor: .textBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.10)))
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
