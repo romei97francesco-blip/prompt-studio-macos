@@ -4,10 +4,39 @@ struct RouterModel: Decodable, Identifiable {
     let id: String
     let name: String
     let architecture: Architecture?
+    let pricing: Pricing?
     struct Architecture: Decodable { let output_modalities: [String]? }
+    /// Prezzi OpenRouter in USD per singolo token, come stringhe decimali.
+    struct Pricing: Decodable { let prompt: String?; let completion: String? }
+
+    /// Costo stimato in USD per una generazione, dai prezzi del catalogo.
+    /// Restituisce `nil` se il modello non espone entrambi i prezzi.
+    func estimatedCost(promptTokens: Int, completionTokens: Int) -> Double? {
+        guard let pricing,
+              let promptPrice = pricing.prompt.flatMap({ Double($0) }),
+              let completionPrice = pricing.completion.flatMap({ Double($0) }) else { return nil }
+        return Double(promptTokens) * promptPrice + Double(completionTokens) * completionPrice
+    }
 }
 
-struct RouterResult { let text: String; let truncated: Bool; let tokens: Int? }
+/// Token consumati da una generazione, come riportati da OpenRouter.
+struct Usage: Equatable {
+    let prompt: Int?
+    let completion: Int?
+    let total: Int?
+
+    /// Estrae i token dal campo `usage` di una risposta OpenRouter, se presente.
+    static func from(_ json: [String: Any]) -> Usage? {
+        guard let usage = json["usage"] as? [String: Any] else { return nil }
+        let prompt = usage["prompt_tokens"] as? Int
+        let completion = usage["completion_tokens"] as? Int
+        let total = usage["total_tokens"] as? Int
+        guard prompt != nil || completion != nil || total != nil else { return nil }
+        return Usage(prompt: prompt, completion: completion, total: total)
+    }
+}
+
+struct RouterResult { let text: String; let truncated: Bool; let usage: Usage? }
 
 struct OpenRouterError: LocalizedError {
     let message: String
@@ -102,12 +131,12 @@ enum OpenRouter {
             if finishReason == "length" { throw failure("Il modello ha esaurito il limite di output prima di scrivere il prompt. Riduci la richiesta o riprova.") }
             throw failure("Il modello non ha restituito testo. Riprova; se il problema continua, cambia modello generatore.")
         }
-        return RouterResult(text: content, truncated: finishReason == "length", tokens: (json["usage"] as? [String: Any])?["total_tokens"] as? Int)
+        return RouterResult(text: content, truncated: finishReason == "length", usage: Usage.from(json))
     }
 
     enum StreamEvent: Equatable {
         case delta(String, reason: String?)
-        case finished(reason: String?, tokens: Int?)
+        case finished(reason: String?, usage: Usage?)
         case failure(String)
     }
 
@@ -116,22 +145,22 @@ enum OpenRouter {
         guard trimmed.hasPrefix("data:") else { return nil }
         let payload = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
         guard !payload.isEmpty else { return nil }
-        if payload == "[DONE]" { return .finished(reason: nil, tokens: nil) }
+        if payload == "[DONE]" { return .finished(reason: nil, usage: nil) }
         guard let data = payload.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         if let error = json["error"] as? [String: Any] {
             let detail = (error["message"] as? String) ?? "errore del fornitore"
             return .failure("OpenRouter ha segnalato un errore durante la generazione: \(detail)")
         }
-        let tokens = (json["usage"] as? [String: Any])?["total_tokens"] as? Int
+        let usage = Usage.from(json)
         guard let choices = json["choices"] as? [[String: Any]], let first = choices.first else {
-            return tokens == nil ? nil : .finished(reason: nil, tokens: tokens)
+            return usage == nil ? nil : .finished(reason: nil, usage: usage)
         }
         let reason = first["finish_reason"] as? String
         if let delta = first["delta"] as? [String: Any], let content = deltaText(from: delta["content"]) {
             return .delta(content, reason: reason)
         }
-        if reason != nil { return .finished(reason: reason, tokens: tokens) }
+        if reason != nil { return .finished(reason: reason, usage: usage) }
         return nil
     }
 
@@ -173,6 +202,41 @@ enum OpenRouter {
         case .cancelled: return "Generazione annullata."
         default: return "Errore di rete: \(urlError.localizedDescription)"
         }
+    }
+
+    // MARK: - Riepilogo di consumo
+
+    /// Riepilogo leggibile dei token consumati e del costo stimato.
+    /// `model` è il modello generatore, se presente nel catalogo con i prezzi.
+    /// Restituisce `nil` se non ci sono token da mostrare.
+    static func usageSummary(_ usage: Usage?, model: RouterModel?) -> String? {
+        guard let usage else { return nil }
+        let prompt = usage.prompt
+        let completion = usage.completion
+        let total = usage.total ?? (prompt ?? 0) + (completion ?? 0)
+        guard total > 0 || prompt != nil || completion != nil else { return nil }
+        let tokens: String
+        if let prompt, let completion {
+            tokens = "\(total) token (\(prompt) in + \(completion) out)"
+        } else {
+            tokens = "\(total) token"
+        }
+        guard let prompt, let completion,
+              let cost = model?.estimatedCost(promptTokens: prompt, completionTokens: completion) else {
+            return "\(tokens) • costo non stimabile"
+        }
+        return "\(tokens) • stima ~\(formattedCost(cost))"
+    }
+
+    /// Formatta un costo in USD con decimali sufficienti per gli importi piccoli.
+    private static func formattedCost(_ cost: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "it_IT")
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = cost < 0.01 ? 6 : 4
+        let value = formatter.string(from: NSNumber(value: cost)) ?? String(format: "%.4f", cost)
+        return "$\(value)"
     }
 
     // MARK: - Catalogo su disco

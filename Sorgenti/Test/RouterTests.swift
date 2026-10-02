@@ -15,9 +15,10 @@ import Foundation
         for pair in [("", "vendor/model"), ("test-key", " ")] {
             do { _ = try OpenRouter.request(key: pair.0, model: pair.1, system: "", draft: ""); fatalError("Missing validation") } catch {}
         }
-        let valid = Data(#"{"choices":[{"finish_reason":"stop","message":{"content":"Il prompt"}}],"usage":{"total_tokens":25}}"#.utf8)
+        let valid = Data(#"{"choices":[{"finish_reason":"stop","message":{"content":"Il prompt"}}],"usage":{"prompt_tokens":10,"completion_tokens":15,"total_tokens":25}}"#.utf8)
         let result = try OpenRouter.parse(valid, status:200)
-        precondition(result.text == "Il prompt" && !result.truncated && result.tokens == 25)
+        precondition(result.text == "Il prompt" && !result.truncated && result.usage?.total == 25)
+        precondition(result.usage?.prompt == 10 && result.usage?.completion == 15)
         let multipart = Data(#"{"choices":[{"finish_reason":"stop","message":{"content":[{"type":"text","text":"Prima riga"},{"type":"text","text":"Seconda riga"}]}}]}"#.utf8)
         let multipartResult = try OpenRouter.parse(multipart, status:200)
         precondition(multipartResult.text == "Prima riga\nSeconda riga")
@@ -30,9 +31,22 @@ import Foundation
         for raw in [#"{"error":{"message":"private provider error"}}"#, #"{"choices":[]}"#, #"{"choices":[{"message":{"content":" "}}]}"#, #"{"choices":[{"finish_reason":"length","message":{"content":null,"reasoning":"budget usato"}}]}"#] {
             do { _ = try OpenRouter.parse(Data(raw.utf8), status:200); fatalError("Invalid content accepted") } catch {}
         }
-        let catalog = Data(#"{"data":[{"id":"v/image","name":"Image","architecture":{"output_modalities":["image"]}},{"id":"v/text","name":"Text","architecture":{"output_modalities":["text"]}}]}"#.utf8)
+        let catalog = Data(#"{"data":[{"id":"v/image","name":"Image","architecture":{"output_modalities":["image"]}},{"id":"v/text","name":"Text","architecture":{"output_modalities":["text"]},"pricing":{"prompt":"0.00000015","completion":"0.0000006"}}]}"#.utf8)
         let models = try OpenRouter.catalog(catalog)
         precondition(models.count == 1 && models[0].id == "v/text")
+        precondition(models[0].pricing?.prompt == "0.00000015" && models[0].pricing?.completion == "0.0000006")
+
+        // Stima di costo: prezzi in USD per singolo token (1000*0.00000015 + 500*0.0000006).
+        let cost = models[0].estimatedCost(promptTokens: 1000, completionTokens: 500)
+        precondition(cost != nil && abs(cost! - 0.00045) < 1e-12)
+        let unpriced = RouterModel(id: "x", name: "X", architecture: nil, pricing: nil)
+        precondition(unpriced.estimatedCost(promptTokens: 10, completionTokens: 10) == nil)
+
+        // Riepilogo di consumo: token e stima di costo, con fallback quando i prezzi mancano.
+        precondition(OpenRouter.usageSummary(nil, model: models[0]) == nil)
+        precondition(OpenRouter.usageSummary(Usage(prompt: 1000, completion: 500, total: 1500), model: models[0]) == "1500 token (1000 in + 500 out) • stima ~$0,00045")
+        precondition(OpenRouter.usageSummary(Usage(prompt: 10, completion: 5, total: 15), model: nil) == "15 token (10 in + 5 out) • costo non stimabile")
+        precondition(OpenRouter.usageSummary(Usage(prompt: nil, completion: nil, total: 42), model: models[0]) == "42 token • costo non stimabile")
 
         // Limite di token di output: default documentato e valore personalizzato.
         precondition(OpenRouter.defaultMaxOutputTokens == 3500)
@@ -55,9 +69,9 @@ import Foundation
         precondition(OpenRouter.streamEvent(from: #"data: {"choices":[{"delta":{"content":""}}]}"#) == nil)
         precondition(OpenRouter.streamEvent(from: #"data: {"choices":[{"delta":{"content":" "}}]}"#) == .delta(" ", reason: nil))
         precondition(OpenRouter.streamEvent(from: #"data: {"choices":[{"delta":{"content":"\n"}}]}"#) == .delta("\n", reason: nil))
-        precondition(OpenRouter.streamEvent(from: #"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#) == .finished(reason: "stop", tokens: nil))
-        precondition(OpenRouter.streamEvent(from: #"data: {"choices":[],"usage":{"total_tokens":42}}"#) == .finished(reason: nil, tokens: 42))
-        precondition(OpenRouter.streamEvent(from: "data: [DONE]") == .finished(reason: nil, tokens: nil))
+        precondition(OpenRouter.streamEvent(from: #"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#) == .finished(reason: "stop", usage: nil))
+        precondition(OpenRouter.streamEvent(from: #"data: {"choices":[],"usage":{"total_tokens":42}}"#) == .finished(reason: nil, usage: Usage(prompt: nil, completion: nil, total: 42)))
+        precondition(OpenRouter.streamEvent(from: "data: [DONE]") == .finished(reason: nil, usage: nil))
         precondition(OpenRouter.streamEvent(from: "data: non-json") == nil)
         if case .failure(let message)? = OpenRouter.streamEvent(from: #"data: {"error":{"message":"boom"}}"#) {
             precondition(message.contains("boom"))
@@ -91,25 +105,25 @@ import Foundation
             #"data: {"choices":[{"delta":{"content":" "}}]}"#,
             #"data: {"choices":[{"delta":{"content":"chiaro"}}]}"#,
             #"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#,
-            #"data: {"choices":[],"usage":{"total_tokens":123}}"#,
+            #"data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":23,"total_tokens":123}}"#,
             "data: [DONE]"
         ]
         var assembled = ""
         var finalReason: String?
-        var finalTokens: Int?
+        var finalUsage: Usage?
         for line in transcript {
             guard let event = OpenRouter.streamEvent(from: line) else { continue }
             switch event {
             case .delta(let chunk, _): assembled += chunk
-            case .finished(let reason, let tokens):
+            case .finished(let reason, let usage):
                 if let reason { finalReason = reason }
-                if let tokens { finalTokens = tokens }
+                if let usage { finalUsage = usage }
             case .failure(let message): fatalError("Errore inatteso nello stream: \(message)")
             }
         }
         precondition(assembled == "OBIETTIVO chiaro")
         precondition(finalReason == "stop")
-        precondition(finalTokens == 123)
+        precondition(finalUsage?.total == 123 && finalUsage?.prompt == 100 && finalUsage?.completion == 23)
 
         // Alcuni fornitori accorpano l'ultimo contenuto e finish_reason nella stessa riga:
         // il motivo di fine non deve andare perso, altrimenti il troncamento passa inosservato.
@@ -152,6 +166,6 @@ import Foundation
         precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(-2 * 86400), now: now) == "2 giorni fa")
         precondition(OpenRouter.ageDescription(since: now.addingTimeInterval(60), now: now) == "poco fa")
 
-        print("PASS: request, no-reasoning text mode, credential/model validation, string and multipart responses, truncation, 8 HTTP errors, malformed content, model filtering, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
+        print("PASS: request, no-reasoning text mode, credential/model validation, string and multipart responses, truncation, 8 HTTP errors, malformed content, model filtering, pricing and cost estimate, usage summary, streaming request, SSE events (including combined finish_reason), retry classification, backoff and network messages. No network calls.")
     }
 }
